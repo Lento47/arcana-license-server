@@ -8,6 +8,8 @@ id = "63e54bc7b2e8405cb4db5d926e1f2685"
 
 [env.production]
 routes = [{ pattern = "api.arcana.otnelhq.com/*", zone_id = "3c5d5afdbd04d5fda736a13e8008d659" }]
+kv_namespaces = [{ binding = "ARCANA_LICENSE", id = "63e54bc7b2e8405cb4db5d926e1f2685" }]
 
 [env.development]
 workers_dev = true
+kv_namespaces = [{ binding = "ARCANA_LICENSE", id = "63e54bc7b2e8405cb4db5d926e1f2685" }]
