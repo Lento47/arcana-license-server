@@ -41,6 +41,25 @@ export class LicenseKV {
     }))).reduce((a, b) => a + b, 0)
   }
 
+  async listAll(): Promise<LicenseKey[]> {
+    const list = await this.kv.list({ prefix: LICENSE_PREFIX })
+    const keys: LicenseKey[] = []
+    for (const { name } of list.keys) {
+      const val = await this.kv.get(name, "json") as LicenseKey | null
+      if (val) keys.push(val)
+    }
+    return keys
+  }
+
+  async putAccount(licenseKey: string, data: { email?: string; username?: string }): Promise<void> {
+    await this.kv.put(`account:${licenseKey}`, JSON.stringify(data), { expirationTtl: 86400 * 365 })
+  }
+
+  async getAccount(licenseKey: string): Promise<{ email?: string; username?: string } | null> {
+    const raw = await this.kv.get(`account:${licenseKey}`, "json")
+    return raw as { email?: string; username?: string } | null
+  }
+
   async trackUsage(tenantId: string, date: string, tokens: number, calls: number): Promise<void> {
     const key = USAGE_PREFIX + tenantId + ":" + date
     const current = await this.kv.get(key, "json") as { tokens: number; calls: number } | null

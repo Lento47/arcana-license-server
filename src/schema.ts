@@ -33,8 +33,9 @@ export interface ValidateResponse {
 
 export interface ActivateRequest {
   licenseKey: string
-  email?: string
   machineId: string
+  email?: string
+  username?: string
 }
 
 export interface ActivateResponse {
