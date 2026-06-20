@@ -29,16 +29,18 @@ export class LicenseKV {
     await this.kv.put(MACHINE_PREFIX + binding.machineId, JSON.stringify(binding))
   }
 
+  async incrementMachineCount(licenseKey: string, delta: 1 | -1): Promise<void> {
+    const key = `machines:${licenseKey}`
+    const current = parseInt(await this.kv.get(key) ?? "0", 10)
+    await this.kv.put(key, String(Math.max(0, current + delta)))
+  }
+
+  async getMachineCount(licenseKey: string): Promise<number> {
+    return parseInt(await this.kv.get(`machines:${licenseKey}`) ?? "0", 10)
+  }
+
   async countMachines(licenseKey: string): Promise<number> {
-    const list = await this.kv.list({ prefix: MACHINE_PREFIX })
-    const keys = list.keys.filter(async (k) => {
-      const val = await this.kv.get(k.name, "json") as MachineBinding | null
-      return val?.licenseKey === licenseKey
-    })
-    return (await Promise.all(keys.map(async (k) => {
-      const val = await this.kv.get(k.name, "json") as MachineBinding | null
-      return val?.licenseKey === licenseKey ? 1 : 0
-    }))).reduce((a, b) => a + b, 0)
+    return this.getMachineCount(licenseKey)
   }
 
   async listAll(): Promise<LicenseKey[]> {
@@ -69,6 +71,9 @@ export class LicenseKV {
     }))
   }
 
+  // WARNING: This hash has only ~32 bits of output and is NOT cryptographic.
+  // At ~77K keys, birthday collisions become likely.
+  // TODO: Replace with SHA-256 via crypto.subtle.digest()
   private hashKey(key: string): string {
     let hash = 0
     for (let i = 0; i < key.length; i++) {
@@ -78,6 +83,6 @@ export class LicenseKV {
   }
 
   private ttlUntil(timestamp: number): number {
-    return Math.max(60, Math.ceil((timestamp - Date.now() / 1000)))
+    return Math.max(60, Math.ceil((timestamp - Date.now()) / 1000))
   }
 }

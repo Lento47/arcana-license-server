@@ -38,6 +38,8 @@ const TIERS: Record<string, { features: string[]; seats: number; maxMachines: nu
   },
 }
 
+// WARNING: Seed key is hardcoded. This is a development backdoor.
+// In production, this should be removed or gated behind an env var check.
 const SEED_KEYS: Record<string, { tier: string; seats: number; maxMachines: number }> = {
   "ARCANA-DEV-0000-0000-0000-000000000001": { tier: "enterprise", seats: 100, maxMachines: 100 },
 }
@@ -96,6 +98,8 @@ export default {
           return handleCreate(request, kv, corsHeaders, env.ARCANA_ADMIN_KEY)
         case "/api/license/list":
           return handleList(request, kv, corsHeaders, env.ARCANA_ADMIN_KEY)
+        case "/api/license/revoke":
+          return handleRevoke(request, kv, corsHeaders, env.ARCANA_ADMIN_KEY)
         case "/api/health":
           return new Response(JSON.stringify({ status: "ok", service: "arcana-license" }), {
             headers: { "Content-Type": "application/json", ...corsHeaders },
@@ -107,7 +111,7 @@ export default {
           })
       }
     } catch (e) {
-      return new Response(JSON.stringify({ error: "internal_error", message: String(e) }), {
+      return new Response(JSON.stringify({ error: "internal_error", message: "An unexpected error occurred" }), {
         status: 500,
         headers: { "Content-Type": "application/json", ...corsHeaders },
       })
@@ -151,7 +155,7 @@ async function handleValidate(request: Request, kv: LicenseKV, cors: Record<stri
     await kv.putMachine(existing)
   }
 
-  const machines = await kv.countMachines(body.licenseKey)
+  const machines = await kv.getMachineCount(body.licenseKey)
   const tier = TIERS[license.tier]
 
   return await json({
@@ -172,14 +176,13 @@ async function handleActivate(request: Request, kv: LicenseKV, cors: Record<stri
     return await json({ valid: false, error: "Missing licenseKey or machineId" }, 400, cors, signingKey)
   }
 
-  // Store email and username if provided
-  if (body.email || body.username) {
-    await kv.putAccount(body.licenseKey, { email: body.email, username: body.username })
-  }
-
   const seed = SEED_KEYS[body.licenseKey]
   if (seed) {
+    if (body.email || body.username) {
+      await kv.putAccount(body.licenseKey, { email: body.email, username: body.username })
+    }
     await kv.putMachine({ licenseKey: body.licenseKey, machineId: body.machineId, activatedAt: Date.now(), lastSeen: Date.now() })
+    await kv.incrementMachineCount(body.licenseKey, 1)
     const tier = TIERS[seed.tier!]
     return await json({ valid: true, tier: seed.tier, features: tier.features, tools: tier.tools, limits: tier.limits, machinesActivated: 1, maxMachines: seed.maxMachines!, email: body.email, username: body.username }, 200, cors, signingKey)
   }
@@ -189,13 +192,18 @@ async function handleActivate(request: Request, kv: LicenseKV, cors: Record<stri
     return await json({ valid: false, error: "Invalid license key" }, 401, cors, signingKey)
   }
 
-  const machines = await kv.countMachines(body.licenseKey)
+  const machines = await kv.getMachineCount(body.licenseKey)
   if (machines >= license.maxMachines) {
     return await json({ valid: false, error: "Maximum machines activated", machinesActivated: machines, maxMachines: license.maxMachines }, 403, cors, signingKey)
   }
 
   await kv.putMachine({ licenseKey: body.licenseKey, machineId: body.machineId, activatedAt: Date.now(), lastSeen: Date.now() })
+  await kv.incrementMachineCount(body.licenseKey, 1)
   const tier = TIERS[license.tier]
+
+  if (body.email || body.username) {
+    await kv.putAccount(body.licenseKey, { email: body.email, username: body.username })
+  }
 
   return await json({
     valid: true,
@@ -224,7 +232,7 @@ async function handleStatus(url: URL, kv: LicenseKV, cors: Record<string, string
     return await json({ error: "License not found" }, 404, cors, signingKey)
   }
 
-  const machines = await kv.countMachines(key)
+  const machines = await kv.getMachineCount(key)
   return await json({
     tier: license.tier,
     expiresAt: license.expiresAt,
@@ -248,7 +256,9 @@ async function handleCreate(request: Request, kv: LicenseKV, cors: Record<string
     return json({ error: "invalid_tier" }, 400, cors)
   }
 
-  const key = `ARCANA-${tier.toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+  const randomBytes = crypto.getRandomValues(new Uint8Array(8))
+  const randomPart = btoa(String.fromCharCode(...randomBytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "").slice(0, 8)
+  const key = `ARCANA-${tier.toUpperCase()}-${Date.now().toString(36).toUpperCase()}-${randomPart}`
   const expiresAt = Date.now() + expiresInDays * 86400 * 1000
 
   await kv.putLicense({
@@ -271,6 +281,23 @@ async function handleList(request: Request, kv: LicenseKV, cors: Record<string, 
 
   const list = await kv.listAll()
   return json({ keys: list }, 200, cors)
+}
+
+async function handleRevoke(request: Request, kv: LicenseKV, cors: Record<string, string>, adminKey: string | undefined): Promise<Response> {
+  if (!adminKey) return json({ error: "admin_not_configured" }, 500, cors)
+
+  const auth = request.headers.get("Authorization") ?? ""
+  if (auth !== `Bearer ${adminKey}`) return json({ error: "unauthorized" }, 401, cors)
+
+  const body = await request.json() as any
+  if (!body.licenseKey) return json({ error: "missing_licenseKey" }, 400, cors)
+
+  // Delete from KV by overwriting with expired entry
+  // Note: Revoking a license does not clean up machine: and machines: entries.
+  // Stale machine bindings remain in KV indefinitely.
+  // TODO: Add cleanup of machine records on revoke.
+  await kv.putLicense({ key: body.licenseKey, tier: "free", seats: 0, maxMachines: 0, expiresAt: 0, createdAt: 0 })
+  return json({ success: true, message: `License ${body.licenseKey} revoked` }, 200, cors)
 }
 
 function hexToBytes(hex: string): Uint8Array {

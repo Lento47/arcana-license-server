@@ -1,6 +1,6 @@
 name = "arcana-license-server"
 main = "src/index.ts"
-compatibility_date = "2026-06-01"
+compatibility_date = "2026-06-20"
 
 [[kv_namespaces]]
 binding = "ARCANA_LICENSE"

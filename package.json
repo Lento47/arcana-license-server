@@ -8,9 +8,6 @@
     "deploy": "wrangler deploy",
     "types": "wrangler types"
   },
-  "dependencies": {
-    "@noble/curves": "^1.8.0"
-  },
   "devDependencies": {
     "wrangler": "^4.0.0",
     "typescript": "^5.8.0",
