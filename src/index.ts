@@ -5,6 +5,7 @@ interface Env {
   ARCANA_LICENSE: KVNamespace
   ARCANA_SIGNING_PRIVATE_KEY?: string
   ARCANA_ADMIN_KEY?: string
+  ARCANA_SEED_KEYS?: string
 }
 
 const TIERS: Record<string, { features: string[]; seats: number; maxMachines: number; tools: string[]; limits: { toolsPerSession: number; sessionsPerDay: number } }> = {
