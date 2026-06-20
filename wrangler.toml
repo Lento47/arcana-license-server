@@ -1,15 +1,15 @@
 name = "arcana-license-server"
 main = "src/index.ts"
 compatibility_date = "2026-06-20"
+workers_dev = true
+
+# Custom domain route lives on the top-level worker (which holds the
+# ARCANA_SIGNING_PRIVATE_KEY / ARCANA_ADMIN_KEY secrets). Deploy with a plain
+# `wrangler deploy` — no named environment.
+routes = [
+  { pattern = "api.arcana.otnelhq.com/*", zone_id = "3c5d5afdbd04d5fda736a13e8008d659" }
+]
 
 [[kv_namespaces]]
 binding = "ARCANA_LICENSE"
 id = "63e54bc7b2e8405cb4db5d926e1f2685"
-
-[env.production]
-routes = [{ pattern = "api.arcana.otnelhq.com/*", zone_id = "3c5d5afdbd04d5fda736a13e8008d659" }]
-kv_namespaces = [{ binding = "ARCANA_LICENSE", id = "63e54bc7b2e8405cb4db5d926e1f2685" }]
-
-[env.development]
-workers_dev = true
-kv_namespaces = [{ binding = "ARCANA_LICENSE", id = "63e54bc7b2e8405cb4db5d926e1f2685" }]
