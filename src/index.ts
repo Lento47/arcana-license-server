@@ -38,16 +38,20 @@ const TIERS: Record<string, { features: string[]; seats: number; maxMachines: nu
   },
 }
 
-// WARNING: Seed key is hardcoded. This is a development backdoor.
-// In production, this should be removed or gated behind an env var check.
-const SEED_KEYS: Record<string, { tier: string; seats: number; maxMachines: number }> = {
-  "ARCANA-DEV-0000-0000-0000-000000000001": { tier: "enterprise", seats: 100, maxMachines: 100 },
+// Seed keys loaded from ARCANA_SEED_KEYS env var (JSON: {"key":{"tier":"enterprise","seats":100,"maxMachines":100}})
+// Defaults to empty — no hardcoded backdoor.
+function loadSeedKeys(env: Env): Record<string, { tier: string; seats: number; maxMachines: number }> {
+  try {
+    if (env.ARCANA_SEED_KEYS) return JSON.parse(env.ARCANA_SEED_KEYS)
+  } catch {}
+  return {}
 }
 
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const kv = new LicenseKV(env.ARCANA_LICENSE)
+    const seedKeys = loadSeedKeys(env)
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -125,7 +129,7 @@ async function handleValidate(request: Request, kv: LicenseKV, cors: Record<stri
     return await json({ valid: false, error: "Missing licenseKey or machineId" }, 400, cors, signingKey)
   }
 
-  const seed = SEED_KEYS[body.licenseKey]
+  const seed = seedKeys[body.licenseKey]
   if (seed) {
     const tier = TIERS[seed.tier!]
     return await json({
@@ -176,7 +180,7 @@ async function handleActivate(request: Request, kv: LicenseKV, cors: Record<stri
     return await json({ valid: false, error: "Missing licenseKey or machineId" }, 400, cors, signingKey)
   }
 
-  const seed = SEED_KEYS[body.licenseKey]
+  const seed = seedKeys[body.licenseKey]
   if (seed) {
     if (body.email || body.username) {
       await kv.putAccount(body.licenseKey, { email: body.email, username: body.username })
@@ -222,7 +226,7 @@ async function handleStatus(url: URL, kv: LicenseKV, cors: Record<string, string
     return await json({ error: "Missing key parameter" }, 400, cors, signingKey)
   }
 
-  const seed = SEED_KEYS[key]
+  const seed = seedKeys[key]
   if (seed) {
     return await json({ tier: seed.tier, expiresAt: null, machinesActivated: 0, maxMachines: seed.maxMachines }, 200, cors, signingKey)
   }
