@@ -39,9 +39,11 @@ const TIERS: Record<string, { features: string[]; seats: number; maxMachines: nu
   },
 }
 
+type SeedKeys = Record<string, { tier: string; seats: number; maxMachines: number }>
+
 // Seed keys loaded from ARCANA_SEED_KEYS env var (JSON: {"key":{"tier":"enterprise","seats":100,"maxMachines":100}})
 // Defaults to empty — no hardcoded backdoor.
-function loadSeedKeys(env: Env): Record<string, { tier: string; seats: number; maxMachines: number }> {
+function loadSeedKeys(env: Env): SeedKeys {
   try {
     if (env.ARCANA_SEED_KEYS) return JSON.parse(env.ARCANA_SEED_KEYS)
   } catch {}
@@ -80,7 +82,7 @@ export default {
     try {
       switch (url.pathname) {
         case "/api/license/validate":
-          return handleValidate(request, kv, corsHeaders, env.ARCANA_SIGNING_PRIVATE_KEY)
+          return handleValidate(request, kv, corsHeaders, seedKeys, env.ARCANA_SIGNING_PRIVATE_KEY)
         case "/api/license/activate": {
           // Per-key activation rate limit (5/min)
           const body = await request.clone().json() as ActivateRequest
@@ -95,10 +97,10 @@ export default {
             }
             await env.ARCANA_LICENSE.put(keyLimitKey, String(keyCount + 1), { expirationTtl: 180 })
           }
-          return handleActivate(request, kv, corsHeaders, env.ARCANA_SIGNING_PRIVATE_KEY)
+          return handleActivate(request, kv, corsHeaders, seedKeys, env.ARCANA_SIGNING_PRIVATE_KEY)
         }
         case "/api/license/status":
-          return handleStatus(url, kv, corsHeaders, env.ARCANA_SIGNING_PRIVATE_KEY)
+          return handleStatus(url, kv, corsHeaders, seedKeys, env.ARCANA_SIGNING_PRIVATE_KEY)
         case "/api/license/create":
           return handleCreate(request, kv, corsHeaders, env.ARCANA_ADMIN_KEY)
         case "/api/license/list":
@@ -124,7 +126,7 @@ export default {
   },
 }
 
-async function handleValidate(request: Request, kv: LicenseKV, cors: Record<string, string>, signingKey?: string): Promise<Response> {
+async function handleValidate(request: Request, kv: LicenseKV, cors: Record<string, string>, seedKeys: SeedKeys, signingKey?: string): Promise<Response> {
   const body = await request.json() as ValidateRequest
   if (!body.licenseKey || !body.machineId) {
     return await json({ valid: false, error: "Missing licenseKey or machineId" }, 400, cors, signingKey)
@@ -175,7 +177,7 @@ async function handleValidate(request: Request, kv: LicenseKV, cors: Record<stri
   }, 200, cors, signingKey)
 }
 
-async function handleActivate(request: Request, kv: LicenseKV, cors: Record<string, string>, signingKey?: string): Promise<Response> {
+async function handleActivate(request: Request, kv: LicenseKV, cors: Record<string, string>, seedKeys: SeedKeys, signingKey?: string): Promise<Response> {
   const body = await request.json() as ActivateRequest
   if (!body.licenseKey || !body.machineId) {
     return await json({ valid: false, error: "Missing licenseKey or machineId" }, 400, cors, signingKey)
@@ -221,7 +223,7 @@ async function handleActivate(request: Request, kv: LicenseKV, cors: Record<stri
   }, 200, cors, signingKey)
 }
 
-async function handleStatus(url: URL, kv: LicenseKV, cors: Record<string, string>, signingKey?: string): Promise<Response> {
+async function handleStatus(url: URL, kv: LicenseKV, cors: Record<string, string>, seedKeys: SeedKeys, signingKey?: string): Promise<Response> {
   const key = url.searchParams.get("key")
   if (!key) {
     return await json({ error: "Missing key parameter" }, 400, cors, signingKey)
