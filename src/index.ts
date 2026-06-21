@@ -51,6 +51,13 @@ function loadSeedKeys(env: Env): SeedKeys {
 }
 
 export default {
+  // Keep-warm cron — pings validate with a no-op to prevent cold starts.
+  // Without this, the infrequently-called validate endpoint cold-starts at
+  // 2-5 seconds on the free tier, causing proxy auth timeouts.
+  async scheduled(_controller: ScheduledController, _env: Env, _ctx: ExecutionContext): Promise<void> {
+    // No-op — the invocation itself keeps the isolate warm.
+  },
+
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url)
     const kv = new LicenseKV(env.ARCANA_LICENSE)
