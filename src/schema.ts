@@ -8,11 +8,6 @@ export interface LicenseKey {
   createdAt: number
 }
 
-// seats  = number of paid entitlements / users the license grants
-// maxMachines = maximum distinct machines that may activate with this license
-// In the current product model, maxMachines is the hard enforcement limit;
-// seats is metadata returned to clients and used for billing/quotas.
-
 export interface MachineBinding {
   licenseKey: string
   machineId: string
@@ -49,24 +44,5 @@ export interface ActivateResponse {
   features?: string[]
   machinesActivated: number
   maxMachines: number
-  error?: string
-}
-
-// OAuth device-flow bind: the engine calls this after the user completes the
-// device-code login at the Arcana console. We verify the access_token by
-// hitting the console's /api/user endpoint, then mint a fresh free-tier
-// license key bound to a generated machineId. The returned `proxyKey` is
-// what the TUI writes to ~/.arcana/proxy_key.
-export interface OAuthBindRequest {
-  accessToken: string
-  server: string
-  email?: string
-}
-
-export interface OAuthBindResponse {
-  ok: boolean
-  proxyKey?: string
-  tier?: string
-  email?: string
   error?: string
 }

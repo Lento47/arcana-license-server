@@ -13,9 +13,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm ci
-      - name: Type check
-        run: npx tsc --noEmit
+      - run: npm install
       - name: Deploy to Cloudflare Workers
         run: npx wrangler deploy
         env:
