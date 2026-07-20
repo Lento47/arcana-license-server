@@ -14,15 +14,7 @@ routes = [
 binding = "ARCANA_LICENSE"
 id = "63e54bc7b2e8405cb4db5d926e1f2685"
 
-[[durable_objects.bindings]]
-name = "ARCANA_USAGE_COUNTER"
-class_name = "UsageCounter"
-
 # Keep the Worker warm — validate endpoint sees infrequent traffic
 # but must respond in <500ms. A cold start on free tier is 2-5s.
 [triggers]
 crons = ["*/1 * * * *"]
-
-[[migrations]]
-tag = "v1"
-new_classes = ["UsageCounter"]

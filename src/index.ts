@@ -1,5 +1,4 @@
 import { LicenseKV } from "./kv"
-import { UsageCounter } from "./usage-counter"
 import type {
   ValidateRequest,
   ActivateRequest,
@@ -10,7 +9,6 @@ import type {
 
 interface Env {
   ARCANA_LICENSE: KVNamespace
-  ARCANA_USAGE_COUNTER?: DurableObjectNamespace
   ARCANA_SIGNING_PRIVATE_KEY?: string
   ARCANA_ADMIN_KEY?: string
   ARCANA_ADMIN_ORIGIN?: string
@@ -222,7 +220,7 @@ const worker = {
         headers: { "Content-Type": "application/json" },
       })
     }
-    const kv = new LicenseKV(env.ARCANA_LICENSE, env.ARCANA_USAGE_COUNTER)
+    const kv = new LicenseKV(env.ARCANA_LICENSE)
     const seedKeys = loadSeedKeys(env)
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
@@ -322,7 +320,6 @@ const worker = {
   },
 }
 
-export { UsageCounter }
 export default worker
 
 async function parseJson<T>(request: Request, cors: Record<string, string>): Promise<T | Response> {
@@ -355,7 +352,7 @@ export function buildAdminCors(origin: string | undefined): Record<string, strin
 // In-worker smoke test endpoint. Only available when ARCANA_ADMIN_KEY is configured.
 // Calls handler functions directly to avoid double-counting against rate limits.
 async function runSmokeTests(env: Env, cors: Record<string, string>): Promise<Response> {
-  const kv = new LicenseKV(env.ARCANA_LICENSE, env.ARCANA_USAGE_COUNTER)
+  const kv = new LicenseKV(env.ARCANA_LICENSE)
   const seedKeys = loadSeedKeys(env)
   const testMachineId = `smoke-${crypto.randomUUID()}`
   const adminHeaders = { "Authorization": `Bearer ${env.ARCANA_ADMIN_KEY}`, "Content-Type": "application/json" }

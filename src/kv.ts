@@ -10,10 +10,7 @@ function bytesToHex(bytes: Uint8Array): string {
 }
 
 export class LicenseKV {
-  constructor(
-    private readonly kv: KVNamespace,
-    private readonly usageCounter?: DurableObjectNamespace,
-  ) {}
+  constructor(private readonly kv: KVNamespace) {}
 
   private async getJsonSafe<T>(key: string): Promise<T | null> {
     try {
@@ -118,19 +115,9 @@ export class LicenseKV {
   }
 
   async trackUsage(tenantId: string, date: string, tokens: number, calls: number): Promise<void> {
-    // Use the Durable Object for atomic counters when available; fall back to a
-    // best-effort KV update when the DO namespace is not bound (legacy/offline
-    // environments).
-    if (this.usageCounter) {
-      const id = this.usageCounter.idFromName(tenantId)
-      const stub = this.usageCounter.get(id)
-      await stub.fetch("http://usage/track", {
-        method: "POST",
-        body: JSON.stringify({ date, tokens, calls }),
-      })
-      return
-    }
-
+    // KV-backed best-effort counter. Concurrent updates may lose increments
+    // under contention; acceptable for usage analytics, not for rate-limit
+    // enforcement.
     const key = USAGE_PREFIX + tenantId + ":" + date
     const current = await this.getJsonSafe<{ tokens: number; calls: number }>(key)
     const next = {
