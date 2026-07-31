@@ -7,6 +7,9 @@ workers_dev = true
 # ARCANA_SIGNING_PRIVATE_KEY / ARCANA_ADMIN_KEY secrets). Deploy with a plain
 # `wrangler deploy` — no named environment.
 routes = [
+  # Primary public entry (hyphen form — Universal SSL works without ACM)
+  { pattern = "api-arcana.otnelhq.com/*", zone_id = "3c5d5afdbd04d5fda736a13e8008d659" },
+  # Legacy multi-level host (needs ACM / may not resolve everywhere)
   { pattern = "api.arcana.otnelhq.com/*", zone_id = "3c5d5afdbd04d5fda736a13e8008d659" }
 ]
 

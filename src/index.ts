@@ -249,8 +249,9 @@ const worker = {
       const clientIp = isNonEmptyString(rawClientIp, 45) ? rawClientIp : "unknown"
       const rateLimitKey = `ratelimit:${clientIp}:${Math.floor(Date.now() / 60000)}`
       const count = safeParseInt(await env.ARCANA_LICENSE.get(rateLimitKey), 0)
-      if (count >= 25) {
-        return new Response(JSON.stringify({ error: "rate_limited", message: "Too many requests. 25 per minute max." }), {
+      // Raised for agentic/dev (was 25/min)
+      if (count >= 250) {
+        return new Response(JSON.stringify({ error: "rate_limited", message: "Too many requests. 250 per minute max." }), {
           status: 429,
           headers: { "Content-Type": "application/json", ...corsHeaders, "Retry-After": "60" },
         })
@@ -265,14 +266,14 @@ const worker = {
           return await handleValidate(request, kv, corsHeaders, seedKeys, env.ARCANA_SIGNING_PRIVATE_KEY)
         case "/api/license/activate": {
           if (request.method !== "POST") return methodNotAllowed(corsHeaders)
-          // Per-key activation rate limit (5/min)
+          // Per-key activation rate limit (raised for agentic/dev; was 5/min)
           const body = await parseJson<ActivateRequest>(request.clone(), corsHeaders)
           if (body instanceof Response) return body
           if (isNonEmptyString(body.licenseKey)) {
             const keyLimitKey = `ratelimit:key:${body.licenseKey}:${Math.floor(Date.now() / 60000)}`
             const keyCount = safeParseInt(await env.ARCANA_LICENSE.get(keyLimitKey), 0)
-            if (keyCount >= 5) {
-              return new Response(JSON.stringify({ error: "rate_limited", message: "Too many activation attempts. 5 per minute per key." }), {
+            if (keyCount >= 50) {
+              return new Response(JSON.stringify({ error: "rate_limited", message: "Too many activation attempts. 50 per minute per key." }), {
                 status: 429,
                 headers: { "Content-Type": "application/json", ...corsHeaders, "Retry-After": "120" },
               })
